@@ -1,4 +1,4 @@
-# Jarkom_Modul3_A06
+# Jarkom_Modul3_Lapres_A06
 Kelompok A06<br>
 Muhammad Fikri Rabbani 	(05111840000165)<br>
 Sandra Agnes Oktaviana 	(05111840000124)
@@ -29,6 +29,10 @@ xterm -T BANYUWANGI -e linux ubd0=BANYUWANGI,jarkom umid=BANYUWANGI eth0=daemon,
 xterm -T MADIUN -e linux ubd0=MADIUN,jarkom umid=MADIUN eth0=daemon,,,switch3 mem=64M &
 
 ```
+
+- `bash topologi.sh`
+- pada router surabaya bash `nano /etc/sysctl.conf` hapus # pada bagian `net.ipv4.ip_forward=1`
+- `sysctl -p`
 
 konfigurasi interfaces pada setiap uml:
 
@@ -64,6 +68,7 @@ konfigurasi interfaces pada setiap uml:
 lakukan:
 ```
 iptables –t nat –A POSTROUTING –o eth0 –j MASQUERADE –s 192.168.0.0/16
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE -s 192.168.1.0/16
 ```
 pada router SURABAYA agar client bisa terhubung dengan internet.
 
@@ -130,4 +135,125 @@ subnet 10.151.73.56 netmask 255.255.255.0 {
 ![11](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/11.png)
 
 
+#### proxy - squid (mojokerto)
+- `apt-get install squid`
+- `service squid status` (cek status squid)
+- `mv /etc/squid/squid.conf /etc/squid/squid.conf.bak`
+
+#### 7.) User autentikasi memiliki format:
+<br>User : userta_a06
+<br>Password : inipassw0rdta_a06
+
+- `apt-get install apache2-utils`
+- `htpasswd -c /etc/squid/passwd userta_a06` (menambahkan user baru)
+- pass: inipassw0rdta_a06
+- `nano /etc/squid/squid.conf` (konfigurasi squid)
+
+```
+http_port 8080
+visible_hostname mojokerto
+
+auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/passwd
+auth_param basic children 5
+auth_param basic realm Proxy
+auth_param basic credentialsttl 2 hours
+auth_param basic casesensitive on
+acl USERS proxy_auth REQUIRED
+
+http_access allow USERS
+```
+#### 8.) Pembatasan waktu akses hari Selasa-Rabu pukul 13.00-18.00.
+- `nano /etc/squid/acl.conf`
+```
+acl JADWAL_TA time TW 13:00-18:00
+```
+
+#### 9.) Pembatasan waktu akses hari Selasa-Kamis pukul 21.00 - 09.00 keesokan harinya (sampai Jumat jam 09.00). 
+```
+acl JADWAL_BIMBINGAN1 time TWH 21:00-23:59
+acl JADWAL_BIMBINGAN2 time WHF 00:00-09:00
+```
+
+#### 10.) setiap mengakses google.com, maka akan di redirect menuju monta.if.its.ac.id (revisi)
+
+tambahkan:
+```
+acl BLOCKGOOGLE dstdomain .google.com
+deny_info http://monta.if.its.ac.id/ BLOCKGOOGLE
+
+http_access deny BLOCKGOOGLE
+
+```
+
+#### 11.) mengubah error page default squid
+- `wget 10.151.36.202/ERR_ACCESS_DENIED`
+- `cp -r ERR_ACCESS_DENIED /usr/share/squid/errors/*/ERR_ACCESS_DENIED`
+
+
+sehingga file /etc/squid/acl.conf berisi:
+
+![12](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/12.png)
+
+dan file /etc/squid/squid.conf berisi: 
+
+![13](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/13.png)
+
+p.s setting http_access diminta untuk setiap jadwal yang sesuai diminta autentifikasi user, maka digunakan AND
+
+#### 12.) domain janganlupa-ta.a06.pw dan memasukkan port 8080. 
+pada dns server (malang)
+- `apt-get update`
+- `apt-get install bind9 -y`
+- `nano /etc/bind/named.conf.local`
+tambahkan:
+
+```
+zone "janganlupa-ta.a06.pw" {
+	type master;
+	file "/etc/bind/jarkom/janganlupa-ta.a06.pw";
+};
+```
+
+![16](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/16.png)
+
+- `mkdir /etc/bind/jarkom`
+- `cp /etc/bind/db.local /etc/bind/jarkom/janganlupa-ta.a06.pw`
+- `nano /etc/bind/jarkom/janganlupa-ta.a06.pw`
+
+![19](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/19.png)
+
+- `named -g`
+
+#### testing proxy
+- di firefox proxy setting:
+<br>HTTP proxy 10.151.73.59 (ip MOJOKERTO)
+<br>port: 8080
+
+- akses its.ac.id
+
+--- jika waktu akses memenuhi jadwal (JADWAL_TA / JADWAL_BIMBINGAN1 / JADWAL_BIMBINGAN2)
+    akan diminta autentifikasi user
+
+![14](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/14.png)
+
+jika berhasil masuk dengan user yang telah didaftarkan, maka akan berhasil mengakses its.ac.id
+
+![15](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/15.png)
+
+--- jika waktu akses tidak sesuai jadwal akan menampilkan page error seperti yang diminta nomor 11<br>
+
+--- jika akses google.com akan di redirect ke monta.if.ac.id<br>
+
+
+#### Revisi dan Kendala Lain
+- no. 10 waktu pengerjaan soal shift belum sama sekali. 
+setelah revisi, google.com tidak bisa diakses, error page:
+
+![17](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/17.png)
+
+- no. 11 sebelumnya dan waktu demo bisa, namun saat hendak dicoba untuk testing screenshot lapres tidak bisa, error page: <br>
+
+![18](https://github.com/asandfghjkl/Jarkom_Modul3_Lapres_A06/blob/main/pics/18.png)
+
+- no. 12 domain belum berhasil digunakan, tidak bisa di ping. setelah revisi masih tidak bisa digunakan.
 
